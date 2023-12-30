@@ -2,4 +2,6 @@ requests
 python-dotenv
 openai
 llama_index
-pymilvus
+pymilvus==2.2.8
+sentence_transformers
+unstructured

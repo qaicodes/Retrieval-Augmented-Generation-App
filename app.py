@@ -1,43 +1,27 @@
 import os
 from dotenv import load_dotenv
 import openai
-from llama_index.vector_stores import MilvusVectorStore
-from llama_index.embeddings import HuggingFaceEmbedding
-from llama_index import SimpleDirectoryReader, VectorStoreIndex, StorageContext, ServiceContext
-from llama_index.query_engine import CitationQueryEngine
-
-load_dotenv()
-openai.api_key = os.getenv("OPENAI_API_KEY")
-ZILLIZ_URI = os.getenv("ZILLIZ_CLUSTER_01_URI")
-ZILLIZ_TOKEN = os.getenv("ZILLIZ_CLUSTER_01_TOKEN")
+from langchain.embeddings.openai import OpenAIEmbeddings
+from langchain.embeddings import HuggingFaceEmbeddings
+from langchain.vectorstores import Milvus
+from langchain.text_splitter import RecursiveCharacterTextSplitter
+from langchain.document_loaders import DirectoryLoader
 
 
-vdb = MilvusVectorStore(
-    uri = ZILLIZ_URI,
-    token = ZILLIZ_TOKEN,
-    collection_name = "breaking_bad",
-    dim = 384
+
+embed_model = HuggingFaceEmbeddings(model_name="sentence-transformers/all-MiniLM-L12-v2")
+
+
+
+
+
+text_splitter = RecursiveCharacterTextSplitter(chunk_size=1000, chunk_overlap=100)
+doc_splits = text_splitter.split_documents(documents.load())
+print(len(doc_splits))
+
+# Set up a vector store used to save the vector embeddings. Here we use Milvus as the vector store.
+vector_store = Milvus.from_documents(
+    doc_splits,
+    embedding=embed_model,
+    connection_args={"host": "localhost", "port": 19530}, collection_name="wiki"
 )
-
-embed_model = HuggingFaceEmbedding(model_name="sentence-transformers/all-MiniLM-L12-v2")
-
-
-storage_context = StorageContext.from_defaults(vector_store=vdb)
-service_context = ServiceContext.from_defaults(embed_model=embed_model)
-
-documents = SimpleDirectoryReader("./halloween_data/").load_data()
-
-vector_index = VectorStoreIndex.from_documents(documents, storage_context=storage_context, service_context=service_context)
-
-
-
-query_engine = CitationQueryEngine.from_args(
-    vector_index,
-    similarity_top_k=3,
-    # here we can control how granular citation sources are, the default is 512
-    citation_chunk_size=512,
-)
-
-response = query_engine.query("Who is the main character?")
-for source in response.source_nodes:
-    print(source.node.get_text())
